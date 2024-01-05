@@ -108,60 +108,6 @@ if device == torch.device("cpu"):
 
 model.eval()
 
-DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant. 你是一个乐于助人的助手。"""
-
-TEMPLATE_WITH_SYSTEM_PROMPT = (
-    "[INST] <<SYS>>\n" "{system_prompt}\n" "<</SYS>>\n\n" "{instruction} [/INST]"
-)
-
-TEMPLATE_WITHOUT_SYSTEM_PROMPT = "[INST] {instruction} [/INST]"
-
-
-def generate_prompt(
-        instruction, response="", with_system_prompt=True, system_prompt=None
-):
-    if with_system_prompt is True:
-        if system_prompt is None:
-            system_prompt = DEFAULT_SYSTEM_PROMPT
-        prompt = TEMPLATE_WITH_SYSTEM_PROMPT.format_map(
-            {"instruction": instruction, "system_prompt": system_prompt}
-        )
-    else:
-        prompt = TEMPLATE_WITHOUT_SYSTEM_PROMPT.format_map({"instruction": instruction})
-    if len(response) > 0:
-        prompt += " " + response
-    return prompt
-
-
-def generate_completion_prompt(instruction: str):
-    """Generate prompt for completion"""
-    return generate_prompt(instruction, response="", with_system_prompt=True)
-
-
-def generate_chat_prompt(messages: list):
-    """Generate prompt for chat completion"""
-
-    system_msg = None
-    for msg in messages:
-        if msg.role == "system":
-            system_msg = msg.content
-    prompt = ""
-    is_first_user_content = True
-    for msg in messages:
-        if msg.role == "system":
-            continue
-        if msg.role == "user":
-            if is_first_user_content is True:
-                prompt += generate_prompt(
-                    msg.content, with_system_prompt=True, system_prompt=system_msg
-                )
-                is_first_user_content = False
-            else:
-                prompt += "<s>" + generate_prompt(msg.content, with_system_prompt=False)
-        if msg.role == "assistant":
-            prompt += f" {msg.content}" + "</s>"
-    return prompt
-
 
 def predict(
         input,
@@ -174,17 +120,8 @@ def predict(
         do_sample=True,
         **kwargs,
 ):
-    """
-    Main inference method
-    type(input) == str -> /v1/completions
-    type(input) == list -> /v1/chat/completions
-    """
-    if isinstance(input, str):
-        prompt = generate_completion_prompt(input)
-    else:
-        prompt = generate_chat_prompt(input)
-    inputs = tokenizer(prompt, return_tensors="pt")
-    input_ids = inputs["input_ids"].to(device)
+    input_ids = tokenizer.apply_chat_template(conversation=input, tokenize=True, add_generation_prompt=True,
+                                              return_tensors='pt')
     generation_config = GenerationConfig(
         temperature=temperature,
         top_p=top_p,
@@ -199,13 +136,12 @@ def predict(
     generation_config.repetition_penalty = float(repetition_penalty)
     with torch.no_grad():
         generation_output = model.generate(
-            input_ids=input_ids,
+            input_ids=input_ids.to('cuda'),
             generation_config=generation_config,
         )
-    s = generation_output.sequences[0]
-    output = tokenizer.decode(s, skip_special_tokens=True)
-    output = output.split("[/INST]")[-1].strip()
-    return output
+    output_ids = generation_output.sequences[0]
+    response = tokenizer.decode(output_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
+    return response
 
 
 def stream_predict(
@@ -230,12 +166,8 @@ def stream_predict(
     )
     yield "{}".format(chunk.json(exclude_unset=True, ensure_ascii=False))
 
-    if isinstance(input, str):
-        prompt = generate_completion_prompt(input)
-    else:
-        prompt = generate_chat_prompt(input)
-    inputs = tokenizer(prompt, return_tensors="pt")
-    input_ids = inputs["input_ids"].to(device)
+    input_ids = tokenizer.apply_chat_template(conversation=input, tokenize=True, add_generation_prompt=True,
+                                              return_tensors='pt')
     generation_config = GenerationConfig(
         temperature=temperature,
         top_p=top_p,
@@ -248,7 +180,7 @@ def stream_predict(
     streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     generation_kwargs = dict(
         streamer=streamer,
-        input_ids=input_ids,
+        input_ids=input_ids.to('cuda'),
         generation_config=generation_config,
         return_dict_in_generate=True,
         output_scores=False,

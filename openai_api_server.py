@@ -130,7 +130,6 @@ def predict(
         do_sample=do_sample,
         **kwargs,
     )
-    generation_config.return_dict_in_generate = True
     generation_config.output_scores = False
     generation_config.max_new_tokens = max_new_tokens
     generation_config.repetition_penalty = float(repetition_penalty)
@@ -139,7 +138,7 @@ def predict(
             input_ids=input_ids.to(device),
             generation_config=generation_config,
         )
-    response = tokenizer.decode(output_ids.sequences[0], skip_special_tokens=True)
+    response = tokenizer.decode(output_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
     return response
 
 
@@ -265,11 +264,8 @@ async def create_chat_completion(request: ChatCompletionRequest):
         do_sample=request.do_sample,
     )
     choices = [
-        ChatCompletionResponseChoice(index=i, message=msg) for i, msg in enumerate(msgs)
-    ]
-    choices += [
         ChatCompletionResponseChoice(
-            index=len(choices), message=ChatMessage(role="assistant", content=output)
+            index=0, message=ChatMessage(role="assistant", content=output)
         )
     ]
     return ChatCompletionResponse(choices=choices)

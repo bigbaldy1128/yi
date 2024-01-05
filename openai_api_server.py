@@ -136,7 +136,7 @@ def predict(
     generation_config.repetition_penalty = float(repetition_penalty)
     with torch.no_grad():
         output_ids = model.generate(
-            input_ids=input_ids.to('cuda'),
+            input_ids=input_ids.to(device),
             generation_config=generation_config,
         )
     response = tokenizer.decode(output_ids.sequences[0], skip_special_tokens=True)
@@ -179,7 +179,7 @@ def stream_predict(
     streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     generation_kwargs = dict(
         streamer=streamer,
-        input_ids=input_ids.to('cuda'),
+        input_ids=input_ids.to(device),
         generation_config=generation_config,
         return_dict_in_generate=True,
         output_scores=False,

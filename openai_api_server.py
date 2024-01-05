@@ -140,6 +140,7 @@ def predict(
             generation_config=generation_config,
         )
     response = tokenizer.decode(output_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
+    print(f"predict:${response}")
     return response
 
 

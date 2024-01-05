@@ -135,11 +135,10 @@ def predict(
     generation_config.max_new_tokens = max_new_tokens
     generation_config.repetition_penalty = float(repetition_penalty)
     with torch.no_grad():
-        generation_output = model.generate(
+        output_ids = model.generate(
             input_ids=input_ids.to('cuda'),
             generation_config=generation_config,
         )
-    output_ids = generation_output.sequences[0]
     response = tokenizer.decode(output_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
     return response
 

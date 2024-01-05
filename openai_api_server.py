@@ -57,7 +57,7 @@ from openai_api_protocol import (
     DeltaMessage,
 )
 
-load_type = torch.float16
+load_type = 'auto'  # torch.float16
 if torch.cuda.is_available():
     device = torch.device(0)
 else:

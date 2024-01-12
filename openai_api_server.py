@@ -5,6 +5,30 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from threading import Thread
 from sse_starlette.sse import EventSourceResponse
+import torch
+import torch.nn.functional as F
+from transformers import (
+    AutoModelForCausalLM,
+    LlamaTokenizer,
+    GenerationConfig,
+    TextIteratorStreamer,
+    BitsAndBytesConfig
+)
+from peft import PeftModel
+import sys
+from openai_api_protocol import (
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    ChatMessage,
+    ChatCompletionResponseChoice,
+    CompletionRequest,
+    CompletionResponse,
+    CompletionResponseChoice,
+    EmbeddingsRequest,
+    EmbeddingsResponse,
+    ChatCompletionResponseStreamChoice,
+    DeltaMessage,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--base_model', default=None, type=str, required=True)
@@ -27,35 +51,8 @@ if args.load_in_8bit and args.load_in_4bit:
     raise ValueError("Only one quantization method can be chosen for inference. Please check your arguments")
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
 
-import torch
-import torch.nn.functional as F
-from transformers import (
-    AutoModelForCausalLM,
-    LlamaTokenizer,
-    GenerationConfig,
-    TextIteratorStreamer,
-    BitsAndBytesConfig
-)
-from peft import PeftModel
-
-import sys
-
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
-
-from openai_api_protocol import (
-    ChatCompletionRequest,
-    ChatCompletionResponse,
-    ChatMessage,
-    ChatCompletionResponseChoice,
-    CompletionRequest,
-    CompletionResponse,
-    CompletionResponseChoice,
-    EmbeddingsRequest,
-    EmbeddingsResponse,
-    ChatCompletionResponseStreamChoice,
-    DeltaMessage,
-)
 
 load_type = 'auto'  # torch.float16
 if torch.cuda.is_available():
@@ -77,7 +74,7 @@ base_model = AutoModelForCausalLM.from_pretrained(
     args.base_model,
     torch_dtype=load_type,
     low_cpu_mem_usage=True,
-    device_map='auto' if not args.only_cpu else None,
+    device_map='cuda', #if not args.only_cpu else None,
     load_in_4bit=args.load_in_4bit,
     load_in_8bit=args.load_in_8bit,
     quantization_config=quantization_config if (args.load_in_4bit or args.load_in_8bit) else None,

@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from transformers import (
     AutoModelForCausalLM,
-    LlamaTokenizer,
+    AutoTokenizer,
     GenerationConfig,
     TextIteratorStreamer,
     BitsAndBytesConfig
@@ -63,7 +63,7 @@ if args.tokenizer_path is None:
     args.tokenizer_path = args.lora_model
     if args.lora_model is None:
         args.tokenizer_path = args.base_model
-tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_path, legacy=True)
+tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path, legacy=True)
 if args.load_in_4bit or args.load_in_8bit:
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=args.load_in_4bit,
